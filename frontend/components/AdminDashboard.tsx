@@ -52,6 +52,7 @@ export default function AdminDashboard() {
   const [sessionCount, setSessionCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [flushing, setFlushing] = useState(false)
+  const [currentUptime, setCurrentUptime] = useState<number>(0)
 
   // Fetch all admin data
   const fetchAdminData = async () => {
@@ -67,6 +68,7 @@ export default function AdminDashboard() {
       setCacheStats(cacheData)
       setModelInfo(modelData)
       setSessionCount(sessionData.total_sessions)
+      setCurrentUptime(metricsData.uptime_seconds)
     } catch (error) {
       console.error('Failed to fetch admin data:', error)
     } finally {
@@ -98,6 +100,14 @@ export default function AdminDashboard() {
     fetchAdminData()
     const interval = setInterval(fetchAdminData, 10000) // Refresh every 10s
     return () => clearInterval(interval)
+  }, [])
+
+  // Real-time uptime counter (updates every second)
+  useEffect(() => {
+    const uptimeInterval = setInterval(() => {
+      setCurrentUptime((prev) => prev + 1)
+    }, 1000) // Update every second
+    return () => clearInterval(uptimeInterval)
   }, [])
 
   // Format uptime
@@ -208,7 +218,7 @@ export default function AdminDashboard() {
             <div>
               <p className="text-green-100 text-sm font-medium">System Uptime</p>
               <p className="text-2xl font-bold mt-2">
-                {formatUptime(metrics?.uptime_seconds || 0)}
+                {formatUptime(currentUptime)}
               </p>
             </div>
             <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
