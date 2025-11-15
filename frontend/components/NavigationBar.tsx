@@ -67,7 +67,7 @@ export default function NavigationBar() {
                 >
                   History
                 </Link>
-                {user?.role === 'admin' && (
+                {user?.is_admin && (
                   <Link
                     href="/admin"
                     className="px-3 py-2 rounded-md text-sm font-medium transition-colors"
