@@ -218,32 +218,60 @@ async def send_message_stream(
 
     # Stream generator function
     async def generate_stream():
-        """Generate Server-Sent Events stream."""
+        """Generate Server-Sent Events stream with caching support."""
         full_response = ""
         message_id = str(uuid.uuid4())
+        cached = False
 
         # Send initial event with session_id and message_id
         yield f"data: {json.dumps({'type': 'start', 'session_id': session_id, 'message_id': message_id})}\n\n"
 
-        # Stream LLM response
-        try:
-            token_stream = deps.inference_service.stream_infer(
-                prompt=formatted_prompt,
-                max_tokens=request.max_tokens,
-                temperature=request.temperature
-            )
+        # Check cache first
+        cached_response = deps.cache_manager.get(
+            formatted_prompt,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature
+        )
 
-            for token in token_stream:
-                if token:
-                    full_response += token
-                    yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
-                    # Allow event loop to send data immediately
-                    await asyncio.sleep(0)
+        if cached_response:
+            # Cache hit - simulate streaming from cached response
+            cached = True
+            full_response = cached_response
+            # Simulate token-by-token streaming (split by words)
+            words = cached_response.split(' ')
+            for i, word in enumerate(words):
+                token = word if i == 0 else ' ' + word
+                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+                await asyncio.sleep(0.01)  # Small delay to simulate streaming
+        else:
+            # Cache miss - stream from LLM and cache result
+            try:
+                token_stream = deps.inference_service.stream_infer(
+                    prompt=formatted_prompt,
+                    max_tokens=request.max_tokens,
+                    temperature=request.temperature
+                )
 
-        except Exception as e:
-            error_msg = f"Error generating response: {str(e)}"
-            yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
-            return
+                for token in token_stream:
+                    if token:
+                        full_response += token
+                        yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+                        # Allow event loop to send data immediately
+                        await asyncio.sleep(0)
+
+                # Cache the complete response
+                if full_response:
+                    deps.cache_manager.set(
+                        formatted_prompt,
+                        full_response,
+                        max_tokens=request.max_tokens,
+                        temperature=request.temperature
+                    )
+
+            except Exception as e:
+                error_msg = f"Error generating response: {str(e)}"
+                yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+                return
 
         # Add assistant message to session
         tokens_used = len(full_response.split())
@@ -256,7 +284,7 @@ async def send_message_stream(
         )
 
         # Send completion event
-        yield f"data: {json.dumps({'type': 'done', 'tokens_used': tokens_used, 'timestamp': datetime.utcnow().isoformat()})}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'tokens_used': tokens_used, 'cached': cached, 'timestamp': datetime.utcnow().isoformat()})}\n\n"
 
     return StreamingResponse(
         generate_stream(),
