@@ -68,7 +68,8 @@ class LLMEngine:
                 top_p=settings.MODEL_TOP_P,
                 echo=False,
                 stream=stream,
-                stop=["</s>", "<|user|>", "<|system|>"]  # Stop tokens for TinyLlama-Chat format
+                stop=["</s>", "<|user|>", "<|system|>", "\nUser:", "\nAI:", "\nAssistant:", "User:", "AI:"],  # Stop tokens
+                repeat_penalty=1.1  # Penalize repetition to avoid dialogue loops
             )
 
             if stream:
