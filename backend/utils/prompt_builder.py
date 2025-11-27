@@ -4,9 +4,15 @@ import json, hashlib
 def load_system_prompt(path="prompt.txt") -> str:
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return f.read().strip()
+            content = f.read().strip()
+            # Remove the template placeholders if they exist
+            content = content.replace("Instruction: {prompt}", "").strip()
+            content = content.replace("Response:", "").strip()
+            if not content:
+                return "You are a helpful AI assistant."
+            return content
     except:
-        return "You are a helpful assistant."
+        return "You are a helpful AI assistant."
 
 def fmt_chat(role: str, content: str) -> str:
     return (
